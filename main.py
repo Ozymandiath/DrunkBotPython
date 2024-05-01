@@ -8,23 +8,44 @@ from aiogram.client.bot import DefaultBotProperties
 from aiogram.enums import ParseMode
 
 from dotenv import find_dotenv, load_dotenv
+
 load_dotenv(find_dotenv())
 
+from middlewares.db import DataBaseSession
+from database.engine import drop_db, create_db, session_maker
 from handlers.user_private import private_router
-
+from handlers.find_opponents import duel_router
 
 TOKEN = getenv("BOT_TOKEN")
+DATABASE_URL = getenv("DATABASE_URL")
 
 dp = Dispatcher()
-
 dp.include_router(private_router)
+dp.include_router(duel_router)
 
 
+async def on_startup(bot):
+    run_param = False
+    if run_param:
+        await drop_db()
 
-async def main() -> None:
+    await create_db()
+
+
+async def on_shutdown(bot):
+    print('Бот лег')
+
+
+async def main():
+    dp.startup.register(on_startup)
+    dp.shutdown.register(on_shutdown)
 
     bot = Bot(TOKEN, default=DefaultBotProperties(parse_mode=ParseMode.HTML))
+
+    dp.update.middleware(DataBaseSession(session_pool=session_maker))
+
     await bot.delete_webhook(drop_pending_updates=True)
+
     await dp.start_polling(bot)
 
 

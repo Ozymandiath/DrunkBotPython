@@ -1,8 +1,13 @@
+from datetime import datetime
+
 from aiogram import Router, types, F
 from aiogram.filters import CommandStart
-from aiogram.types import Message, InlineKeyboardButton, InlineKeyboardMarkup
+from aiogram.types import Message, InlineKeyboardButton
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 from aiogram.utils.markdown import hbold
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from database.orm_query import orm_add_user, orm_get_user_stat, orm_update_stat
 
 private_router = Router()
 
@@ -27,42 +32,65 @@ def kb_start():
     keyboard = types.ReplyKeyboardMarkup(keyboard=kb, resize_keyboard=True)
     return keyboard
 
+
 def kb_duel():
     kb = [
         [types.KeyboardButton(text="Найти Соперника")],
         [types.KeyboardButton(text="Вызвать на Дуэль")],
         [types.KeyboardButton(text="Таверна")],
+        [types.KeyboardButton(text="Назад")],
     ]
     key_duel = types.ReplyKeyboardMarkup(keyboard=kb, resize_keyboard=True)
     return key_duel
 
+
 @private_router.message(CommandStart())
-async def command_start_handler(message: Message) -> None:
-    await message.answer(f"Hello, {hbold(message.from_user.full_name)}!", reply_markup=kb_start())
+async def start_command(message: types.Message, session: AsyncSession):
+    check_user = await orm_get_user_stat(session, message.from_user.id)
+    if check_user is not None:
+        await message.answer("Вы уже зарегистрированы!", reply_markup=kb_start())
+        return
+    obj = {
+        'user_id': message.from_user.id,
+        'username': message.from_user.username
+    }
+    try:
+        await orm_add_user(session, obj)
+        await message.answer("Вы стали новым участником!")
+    except Exception as e:
+        await message.answer(f"Ошибка: \n{str(e)}\nОтправь эту ошибку в поддержку, пускай работают")
+
+    await message.answer(f"Привет, {message.from_user.full_name}!", reply_markup=kb_start())
 
 
 @private_router.message((F.text.lower().contains("статистик")) | (F.text.lower().contains("характеристик")))
-async def static_handler(message: types.Message) -> None:
+async def static_handler(message: types.Message, session: AsyncSession) -> None:
     builder = InlineKeyboardBuilder()
     builder.row(types.InlineKeyboardButton(
         text="Тренироваться",
         callback_data="train")
     )
 
-    await message.answer(f"{hbold("Уровень:")}\t0\tlvl\n"
-                         f"{hbold("Опыт:")}\t0\txp\n"
-                         f"{hbold("Здоровье:")}\t0\thp\n"
-                         f"{hbold("Сила:")}\t0\n"
-                         f"{hbold("Ловкость:")}\t0\n"
-                         f"{hbold("Опьянение:")}\t0\t%\n", reply_markup=builder.as_markup())
+    user_stat = await orm_get_user_stat(session, message.from_user.id)
+    await message.answer(f"{hbold("Уровень:")}\t{user_stat.level}\tlvl\n"
+                         f"{hbold("Опыт:")}\t{user_stat.experience}\txp\n"
+                         f"{hbold("Здоровье:")}\t{user_stat.health}\thp\n"
+                         f"{hbold("Сила:")}\t{user_stat.strength}\n"
+                         f"{hbold("Ловкость:")}\t{user_stat.agility}\n"
+                         f"{hbold("Опьянение:")}\t{user_stat.drunkenness}\t%\n", reply_markup=builder.as_markup())
 
 
 @private_router.callback_query(F.data == "train")
-async def train_action(callback: types.CallbackQuery):
+async def train_action(callback: types.CallbackQuery, session: AsyncSession) -> None:
+    check_user = await orm_get_user_stat(session, callback.from_user.id)
+    if datetime.now().date() == check_user.update_stat:
+        await callback.answer("Тренироваться много нельзя!", show_alert=True)
+        return
+
     await callback.message.answer_animation(
         "CgACAgQAAxkBAANsZhQYQ06lFdzzuYgTPEkrKmWTrU4AAuUCAAJCJxVTCtjm5Yaz5A80BA",
         reply_markup=kb_train()
-    )  # Скала-ГИФ
+    )
 
     cancel_builder = InlineKeyboardBuilder()
     cancel_builder.row(InlineKeyboardButton(text='Отмена', callback_data='cancel'))
@@ -83,32 +111,42 @@ async def cancel_action(callback_query: types.CallbackQuery):
 @private_router.message(F.text == "Здоровье")
 @private_router.message(F.text == "Сила")
 @private_router.message(F.text == "Ловкость")
-async def skills_up_handler(message: Message) -> None:
-    if False:
-        await message.answer("Прокачка недоступна", reply_markup=kb_start())
-    if message.text == "Здоровье":
-        # Отправка в базу
-        await message.answer("Здоровье прокачено!", reply_markup=kb_start())
-    if message.text == "Сила":
-        # Отправка в базу
-        await message.answer("Сила прокачена!", reply_markup=kb_start())
-    if message.text == "Ловкость":
-        # Отправка в базу
-        await message.answer("Ловкость прокачена!", reply_markup=kb_start())
+async def skills_up_handler(message: Message, session: AsyncSession) -> None:
+    user_stat = await orm_get_user_stat(session, message.from_user.id)
+
+    if datetime.now().date() == user_stat.update_stat:
+        await message.answer("Тренироваться много нельзя!", reply_markup=kb_start())
+        return
+    if user_stat:
+        if message.text == "Здоровье":
+            user_stat.health += 10
+            await orm_update_stat(session, message.from_user.id, user_stat)
+            await message.answer("Здоровье прокачено!", reply_markup=kb_start())
+        elif message.text == "Сила":
+            user_stat.strength += 1
+            await orm_update_stat(session, message.from_user.id, user_stat)
+            await message.answer("Сила прокачена!", reply_markup=kb_start())
+        elif message.text == "Ловкость":
+            user_stat.agility += 1
+            await orm_update_stat(session, message.from_user.id, user_stat)
+            await message.answer("Ловкость прокачена!", reply_markup=kb_start())
+    else:
+        await message.answer("Произошла ошибка, попробуйте позже", reply_markup=kb_start())
 
 
 @private_router.message(F.text == "Поединок")
 async def duel_handler(message: Message) -> None:
     await message.answer("Накажи их всех!", reply_markup=kb_duel())
 
+
 @private_router.message(F.animation)
 async def echo_gif(message: Message):
     await message.answer(f"{message.animation.file_id}")
 
 
-@private_router.message()
-async def echo_handler(message: types.Message) -> None:
-    try:
-        await message.send_copy(chat_id=message.chat.id)
-    except TypeError:
-        await message.answer("Nice try!")
+# @private_router.message()
+# async def echo_handler(message: types.Message) -> None:
+#     try:
+#         await message.send_copy(chat_id=message.chat.id)
+#     except TypeError:
+#         await message.answer("Nice try!")
