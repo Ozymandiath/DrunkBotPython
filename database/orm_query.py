@@ -1,7 +1,7 @@
 from sqlalchemy import select, update, delete, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from database.models import User
+from database.models import User, Duel
 
 
 async def orm_add_user(session: AsyncSession, data: dict):
@@ -71,6 +71,84 @@ async def orm_update_user_status(session: AsyncSession, user_id: int, is_searchi
     query = update(User).where(User.user_id == user_id).values(
         is_searching=is_searching,
         is_in_duel=is_in_duel
+    )
+    await session.execute(query)
+    await session.commit()
+
+
+async def orm_check_duel_availability(session: AsyncSession, user_id: int, opponent_username: str):
+    query = select(User).where(User.username == opponent_username)
+    opponent = (await session.execute(query)).first()
+
+    if not opponent:
+        raise ValueError("Пользователь с таким username не найден.")
+
+    existing_challenges = select(Duel).where(
+        Duel.challenger_id == user_id,
+        Duel.opponent_id == opponent.user_id,
+        Duel.status == 'pending'
+    )
+    result_challenges = (await session.execute(existing_challenges)).first()
+
+    existing_opponent = select(Duel).where(
+        Duel.challenger_id == opponent.user_id,
+        Duel.opponent_id == user_id,
+        Duel.status == 'pending'
+    )
+    result_opponent = (await session.execute(existing_opponent)).first()
+
+    # Если вызов уже существует, возвращаем False
+    if result_challenges or result_opponent:
+        return False
+
+    # Если вызова нет, возвращаем True
+    return True
+
+
+async def orm_get_duel(session: AsyncSession, user_id: int):
+    query = select(Duel).where(
+        Duel.opponent_id == user_id,
+        Duel.status == 'pending'
+    )
+    result = await session.execute(query)
+    return result.all()
+
+
+async def orm_update_duel_status(session: AsyncSession, user_id: int, opponent_id: int, status: str):
+    query = update(Duel).where(Duel.opponent_id == user_id, Duel.challenger_id == opponent_id).values(
+        status=status,
+    )
+    await session.execute(query)
+    await session.commit()
+
+
+async def orm_update_duel_win(session: AsyncSession, user_id: int, opponent_id: int, win_id: int):
+    query = update(Duel).where(Duel.opponent_id == user_id, Duel.challenger_id == opponent_id).values(
+        winner_id=win_id,
+    )
+    await session.execute(query)
+    await session.commit()
+
+
+async def orm_check_user(session: AsyncSession, username: str):
+    query = select(User).where(User.username == username)
+    result = await session.execute(query)
+    return result.scalar()
+
+
+async def orm_add_duel(session: AsyncSession, user_id: int, opponent_id: int, status: str):
+    obj = Duel(
+        challenger_id=user_id,
+        opponent_id=opponent_id,
+        status=status,
+    )
+    session.add(obj)
+    await session.commit()
+
+
+async def orm_update_fails(session: AsyncSession, user_id: int, number: int):
+    query = update(User).where(User.user_id == user_id).values(
+        fails=number,
     )
     await session.execute(query)
     await session.commit()

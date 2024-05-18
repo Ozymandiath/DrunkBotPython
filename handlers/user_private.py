@@ -27,7 +27,7 @@ def kb_train():
 def kb_start():
     kb = [
         [types.KeyboardButton(text="Статистика")],
-        [types.KeyboardButton(text="Поединок")]
+        [types.KeyboardButton(text="Начать бой")]
     ]
     keyboard = types.ReplyKeyboardMarkup(keyboard=kb, resize_keyboard=True)
     return keyboard
@@ -36,9 +36,9 @@ def kb_start():
 def kb_duel():
     kb = [
         [types.KeyboardButton(text="Найти Соперника")],
-        [types.KeyboardButton(text="Вызвать на Дуэль")],
-        [types.KeyboardButton(text="Таверна")],
-        [types.KeyboardButton(text="Назад")],
+        [types.KeyboardButton(text="Дуэль")],
+        [types.KeyboardButton(text="Таверна (Будет позже)")],
+        [types.KeyboardButton(text="Назад на главную")],
     ]
     key_duel = types.ReplyKeyboardMarkup(keyboard=kb, resize_keyboard=True)
     return key_duel
@@ -134,9 +134,18 @@ async def skills_up_handler(message: Message, session: AsyncSession) -> None:
         await message.answer("Произошла ошибка, попробуйте позже", reply_markup=kb_start())
 
 
-@private_router.message(F.text == "Поединок")
+@private_router.message(F.text == "Начать бой")
 async def duel_handler(message: Message) -> None:
     await message.answer("Накажи их всех!", reply_markup=kb_duel())
+
+
+@private_router.message(F.text == "Назад на главную")
+async def duel_handler(message: Message) -> None:
+    await message.answer("Выбери свой путь!", reply_markup=kb_start())
+
+@private_router.message(F.text == "Таверна (Будет позже)")
+async def duel_handler(message: Message) -> None:
+    await message.answer("Написано же будет позже, зачем нажимать!", reply_markup=kb_duel())
 
 
 @private_router.message(F.animation)

@@ -1,37 +1,28 @@
 import asyncio
 import random
-import json
 
 from aiogram import Router, F, types
-from aiogram.fsm.state import StatesGroup, State
-from aiogram.fsm.context import FSMContext
 from aiogram.types import Message, CallbackQuery, InlineKeyboardButton
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.future import select
 
 from database.models import User
-# from database.models import User
 from database.orm_query import orm_get_user_stat, orm_get_opponent, orm_update_level, orm_update_user_status, \
-    orm_get_user_status
+    orm_get_user_status, orm_update_fails
 
-duel_router = Router()
+fDuel_router = Router()
 
 
 def kb_start():
     kb = [
         [types.KeyboardButton(text="Статистика")],
-        [types.KeyboardButton(text="Поединок")]
+        [types.KeyboardButton(text="Начать бой")]
     ]
     keyboard = types.ReplyKeyboardMarkup(keyboard=kb, resize_keyboard=True)
     return keyboard
 
 
-class DuelStates(StatesGroup):
-    searching = State()
-
-
-@duel_router.message(F.text == "Найти Соперника")
+@fDuel_router.message(F.text == "Найти Соперника")
 async def find_opponent_handler(message: Message, session: AsyncSession):
     user = await orm_get_user_stat(session, message.from_user.id)
     session.expunge(user)
@@ -66,8 +57,13 @@ async def find_opponent_handler(message: Message, session: AsyncSession):
 
         # Поиск соперника
         opponent = await find_suitable_opponent(user, session)
+        if opponent is None:
+            opponent = False
+        else:
+            opponent = opponent[0]
         status = await orm_get_user_status(session, user.user_id)
-        if opponent and status.is_searching:
+        if opponent and status.is_searching and user.fails < 3:
+            session.expunge(opponent)
             # Начать бой
             await start_duel(user, opponent, message, session)
         elif status.is_searching:
@@ -80,7 +76,7 @@ async def find_opponent_handler(message: Message, session: AsyncSession):
         await message.answer("Произошла ошибка, попробуйте позже", reply_markup=kb_start())
 
 
-@duel_router.callback_query(F.data == 'cancel_search')
+@fDuel_router.callback_query(F.data == 'cancel_search')
 async def cancel_search_handler(callback: CallbackQuery, session: AsyncSession):
     status = await orm_get_user_status(session, callback.from_user.id)
     if status.is_searching and not status.is_in_duel:
@@ -148,6 +144,7 @@ async def start_duel(user, opponent, message: Message, session: AsyncSession) ->
 
         if opponent.health <= 0:
             await message.answer(f"{user.username} победил!")
+            await orm_update_fails(session, user.user_id, 0)
             await level_up(user.user_id, session, message)
             break
 
@@ -164,7 +161,7 @@ async def start_duel(user, opponent, message: Message, session: AsyncSession) ->
 
         if user.health <= 0:
             await message.answer(f"{opponent.username} победил!")
-            # await session.rollback()
+            await orm_update_fails(session, user.user_id, user.fails + 1)
             break
 
 
