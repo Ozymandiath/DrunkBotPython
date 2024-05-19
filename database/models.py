@@ -23,6 +23,7 @@ class User(Base):
     is_in_duel: Mapped[bool] = mapped_column(Boolean, default=False)
     fails: Mapped[int] = mapped_column(Integer, default=0)
     update_stat: Mapped[Date] = mapped_column(Date, default=func.date("1999-01-01"))
+    drunk_date: Mapped[Date] = mapped_column(Date, default=func.date("1999-01-01"))
 
 
 class Duel(Base):

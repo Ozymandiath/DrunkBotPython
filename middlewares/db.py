@@ -19,5 +19,7 @@ class DataBaseSession(BaseMiddleware):
     ) -> Any:
         async with self.session_pool() as session:
             data['session'] = session
-            return await handler(event, data)
+            response = await handler(event, data)
+
+        return response
 

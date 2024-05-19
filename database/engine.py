@@ -7,7 +7,7 @@ from database.models import Base
 # DB_LITE=sqlite+aiosqlite:///my_base.db
 # DB_URL=postgresql+asyncpg://login:password@localhost:5432/db_name
 
-engine = create_async_engine(os.getenv('DATABASE_URL'), echo=True)
+engine = create_async_engine(os.getenv('DATABASE_URL'), echo=False)
 
 # engine = create_async_engine(os.getenv('DB_URL'), echo=True)
 

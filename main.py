@@ -11,6 +11,7 @@ from dotenv import find_dotenv, load_dotenv
 
 load_dotenv(find_dotenv())
 
+from middlewares.check_key import KeyCheckMiddleware
 from middlewares.db import DataBaseSession
 from database.engine import drop_db, create_db, session_maker
 from handlers.user_private import private_router
@@ -45,6 +46,7 @@ async def main():
     bot = Bot(TOKEN, default=DefaultBotProperties(parse_mode=ParseMode.HTML))
 
     dp.update.middleware(DataBaseSession(session_pool=session_maker))
+    dp.update.middleware(KeyCheckMiddleware())
 
     await bot.delete_webhook(drop_pending_updates=True)
 

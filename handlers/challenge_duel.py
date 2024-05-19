@@ -50,7 +50,6 @@ async def duel_state(message: Message, session: AsyncSession, state: FSMContext)
         opponent_username = opponent_username[1:]  # Удаление символа @, если он есть
 
     user_duel = await orm_check_user(session, opponent_username)
-    print(user_duel)
     if user_duel is None:
         await message.answer("Такого Username не найдено!")
         await state.clear()
@@ -98,10 +97,7 @@ async def duel_accept_handler(callback: types.CallbackQuery, session: AsyncSessi
 
 async def get_duel(message: Message, session: AsyncSession):
     list_duel = await orm_get_duel(session, message.from_user.id)
-    print(list_duel)
     for info in list_duel:
-        print(info)
-        print(info[0].challenger_id)
         opponent = await orm_get_user_status(session, info[0].challenger_id)
         cancel_builder = InlineKeyboardBuilder()
         cancel_builder.row(InlineKeyboardButton(text='Отмена', callback_data=f'duel_cancel_{info[0].challenger_id}'),
