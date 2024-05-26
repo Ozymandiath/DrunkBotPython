@@ -17,8 +17,8 @@ chDuel_router = Router()
 
 def kb_start():
     kb = [
-        [types.KeyboardButton(text="Статистика")],
-        [types.KeyboardButton(text="Начать бой")]
+        [types.KeyboardButton(text="Статистика 📊")],
+        [types.KeyboardButton(text="Начать бой ⚔️")]
     ]
     keyboard = types.ReplyKeyboardMarkup(keyboard=kb, resize_keyboard=True)
     return keyboard

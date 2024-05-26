@@ -15,8 +15,8 @@ fDuel_router = Router()
 
 def kb_start():
     kb = [
-        [types.KeyboardButton(text="Статистика")],
-        [types.KeyboardButton(text="Начать бой")]
+        [types.KeyboardButton(text="Статистика 📊")],
+        [types.KeyboardButton(text="Начать бой ⚔️")]
     ]
     keyboard = types.ReplyKeyboardMarkup(keyboard=kb, resize_keyboard=True)
     return keyboard
@@ -216,7 +216,13 @@ async def calculate_damage(attacker, defender, message):
     if random.random() < 0.1:  # 10% шанс на спецудар
         base_damage *= 2
         await asyncio.sleep(1)
-        await message.answer(f"{attacker.username} наносит спецудар с уроном {base_damage:.2f}!")
+        msg_del = await message.answer_animation(
+            "CgACAgQAAxkBAAIKmmZTOZDzSpP2cz2VR_ZiPIFl8QvEAAI4AwAC1SIVUyu5Fg_RzcxFNQQ",
+
+        )
+        await message.answer(f"@{attacker.username} наносит спецудар с уроном {base_damage:.2f}!")
+        await asyncio.sleep(2.5)
+        await msg_del.delete()
     return base_damage
 
 

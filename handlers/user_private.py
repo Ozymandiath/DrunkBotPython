@@ -26,8 +26,8 @@ def kb_train():
 
 def kb_start():
     kb = [
-        [types.KeyboardButton(text="Статистика")],
-        [types.KeyboardButton(text="Начать бой")]
+        [types.KeyboardButton(text="Статистика 📊")],
+        [types.KeyboardButton(text="Начать бой ⚔️")]
     ]
     keyboard = types.ReplyKeyboardMarkup(keyboard=kb, resize_keyboard=True)
     return keyboard
@@ -134,7 +134,7 @@ async def skills_up_handler(message: Message, session: AsyncSession) -> None:
         await message.answer("Произошла ошибка, попробуйте позже", reply_markup=kb_start())
 
 
-@private_router.message(F.text == "Начать бой")
+@private_router.message(F.text == "Начать бой ⚔️")
 async def duel_handler(message: Message) -> None:
     await message.answer("Накажи их всех!", reply_markup=kb_duel())
 
