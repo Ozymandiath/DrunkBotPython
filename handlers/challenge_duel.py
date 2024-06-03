@@ -31,7 +31,7 @@ class DuelStates(StatesGroup):
 @chDuel_router.message(F.text == "Дуэль")
 async def find_opponent_handler(message: Message, session: AsyncSession, state: FSMContext):
     user = await orm_get_user_stat(session, message.from_user.id)
-    session.expunge(user)
+    # session.expunge(user)
     if user:
         # await orm_check_duel_availability(session, user.user_id, message.text)
         await get_duel(message, session)
@@ -59,6 +59,7 @@ async def duel_state(message: Message, session: AsyncSession, state: FSMContext)
     await message.bot.send_message(user_duel.user_id, "Вам отправлен вызов на дуэль, перейдите в дуэли!")
     await state.clear()
 
+
 @chDuel_router.callback_query(F.data == "cancel_duel")
 async def cancel_duel_handler(callback: types.CallbackQuery, state: FSMContext):
     await state.clear()  # Завершение состояния FSM
@@ -83,15 +84,43 @@ async def duel_accept_handler(callback: types.CallbackQuery, session: AsyncSessi
     await callback.message.delete()
 
     user = await orm_get_user_stat(session, callback.from_user.id)
-    session.expunge(user)
+    user_dict = {
+        'id': user.id,
+        'user_id': user.user_id,
+        'username': user.username,
+        'level': user.level,
+        'experience': user.experience,
+        'health': user.health,
+        'strength': user.strength,
+        'agility': user.agility,
+        'drunkenness': user.drunkenness,
+        'is_searching': user.is_searching,
+        'is_in_duel': user.is_in_duel,
+        'fails': user.fails,
+    }
+    # session.expunge(user)
     opponent = await orm_get_user_stat(session, int(id_opponent))
-    session.expunge(opponent)
+    opponent_dict = {
+        'id': opponent.id,
+        'user_id': opponent.user_id,
+        'username': opponent.username,
+        'level': opponent.level,
+        'experience': opponent.experience,
+        'health': opponent.health,
+        'strength': opponent.strength,
+        'agility': opponent.agility,
+        'drunkenness': opponent.drunkenness,
+        'is_searching': opponent.is_searching,
+        'is_in_duel': opponent.is_in_duel,
+        'fails': opponent.fails,
+    }
+    # session.expunge(opponent)
 
     await orm_update_duel_status(session, callback.from_user.id, int(id_opponent), "accepted")
     await callback.answer(show_alert=False)
 
     await orm_update_user_status(session, user.user_id, True, False)
-    await start_duel(user, opponent, callback, session)
+    await start_duel(user_dict, opponent_dict, callback, session)
     await orm_update_user_status(session, user.user_id, False, False)
 
 
@@ -108,105 +137,96 @@ async def get_duel(message: Message, session: AsyncSession):
 
 
 async def start_duel(user, opponent, callback: CallbackQuery, session: AsyncSession) -> None:
-    health_message = await callback.message.answer(
-        f"Здоровье игрока: {user.health}\nЗдоровье противника: {opponent.health}")
-    await asyncio.sleep(0.8)
-    user.strength, user.agility = apply_intoxication_effects(user)
-    opponent.strength, opponent.agility = apply_intoxication_effects(opponent)
-
-    status = await orm_get_user_status(session, user.user_id)
+    status = await orm_get_user_status(session, user['user_id'])
     if not status.is_searching:  # Если поиск был отменен, выходим
         return
 
-    await orm_update_user_status(session, user.user_id, False, True)
-    while user.health > 0 and opponent.health > 0:
-        damage = await calculate_damage(user, opponent, callback.message)
-        opponent.health -= damage
+    health_message = await callback.message.answer(
+        f"Здоровье игрока: {user['health']}\nЗдоровье противника: {opponent['health']}")
+    await asyncio.sleep(1)
+    user['strength'], user['agility'] = apply_intoxication_effects(user)
+    opponent['strength'], opponent['agility'] = apply_intoxication_effects(opponent)
 
-        await asyncio.sleep(0.8)
+    await orm_update_user_status(session, user['user_id'], False, True)
+    while user['health'] > 0 and opponent['health'] > 0:
+        damage = await calculate_damage(user, opponent, callback.message)
+        opponent['health'] -= damage
+
+        await asyncio.sleep(1)
         try:
             await callback.bot.edit_message_text(
-                f"Здоровье игрока: {int(user.health)}\nЗдоровье противника: {int(opponent.health)}",
+                f"Здоровье игрока: {int(user['health'])}\nЗдоровье противника: {int(opponent['health'])}",
                 callback.from_user.id, health_message.message_id)
         except Exception as e:
             print(e)
+            await callback.message.answer("Ошибка редактирования")
 
-        if opponent.health <= 0:
-            await callback.message.answer(f"{user.username} победил!")
-            await orm_update_duel_win(session, user.user_id, opponent.user_id, user.user_id)
-            await level_up(user.user_id, session, callback.message)
+        if opponent['health'] <= 0:
+            await callback.message.answer(f"{user['username']} победил!")
+            await orm_update_duel_win(session, user['user_id'], opponent['user_id'], user['user_id'])
+            await level_up(user['user_id'], session)
             break
 
         damage = await calculate_damage(opponent, user, callback.message)
-        user.health -= damage
+        user['health'] -= damage
 
-        await asyncio.sleep(0.8)
+        await asyncio.sleep(1)
         try:
             await callback.bot.edit_message_text(
-                f"Здоровье игрока: {int(user.health)}\nЗдоровье противника: {int(opponent.health)}",
+                f"Здоровье игрока: {int(user['health'])}\nЗдоровье противника: {int(opponent['health'])}",
                 callback.from_user.id, health_message.message_id)
         except Exception as e:
             print(e)
+            await callback.message.answer("Ошибка редактирования")
 
-        if user.health <= 0:
-            await callback.message.answer(f"{opponent.username} победил!")
-            await orm_update_duel_win(session, user.user_id, opponent.user_id, opponent.user_id)
-            await level_up(opponent.user_id, session, callback.message)
+        if user['health'] <= 0:
+            await callback.message.answer(f"{opponent['username']} победил!")
+            await orm_update_duel_win(session, user['user_id'], opponent['user_id'], opponent['user_id'])
+            await level_up(opponent['user_id'], session)
             break
 
 
 async def level_up(user_id, session, message):
     # await session.rollback()
     user = await orm_get_user_stat(session, user_id)
-    if user.drunkenness < 40:
+    if user.drunkenness < 30:
         user.drunkenness += 5
     user.experience += 50
-    while user.experience >= 100 * (user.level ** 1.5):
+    while user.experience >= 100 * (user.level ** 1.75):
         user.level += 1
         user.health += 20
-        user.strength += 2
-        user.agility += 2
-        user.experience -= int(100 * ((user.level - 1) ** 1.5))
-
-    # user_dict = {
-    #     'id': user.id,
-    #     'user_id': user.user_id,
-    #     'username': user.username,
-    #     'level': user.level,
-    #     'experience': user.experience,
-    #     'health': user.health,
-    #     'strength': user.strength,
-    #     'agility': user.agility,
-    #     'drunkenness': user.drunkenness,
-    #     'is_searching': user.is_searching,
-    #     'created': user.created.isoformat() if user.created else None,
-    #     'updated': user.updated.isoformat() if user.updated else None,
-    # }
-
-    # await message.answer(f"{user_dict} тест!")
+        user.strength += 1
+        user.agility += 1
+        user.experience -= int(100 * ((user.level - 1) ** 1.75))
     await orm_update_level(session, user)
 
 
 def apply_intoxication_effects(self):
     # Увеличение силы и уменьшение ловкости от опьянения
-    effective_strength = self.strength * (1 + min(self.drunkenness * 0.005, 0.25))
-    effective_agility = self.agility * (1 - min(self.drunkenness * 0.003, 0.15))
+    effective_strength = self['strength'] * (1 + min(self['drunkenness'] * 0.008, 0.22))
+    effective_agility = self['agility'] * (1 - min(self['drunkenness'] * 0.005, 0.14))
 
     return effective_strength, effective_agility
 
 
 async def calculate_damage(attacker, defender, message):
     # Проверка уклонения
-    if random.random() < calculate_dodge_reduction(defender.agility):
+    if random.random() < calculate_dodge_reduction(defender['agility']):
         await asyncio.sleep(1)
-        await message.answer(f"{defender.username} избежал атаки!")
+        await message.answer(f"@{defender['username']} избежал атаки!")
         return 0  # Урон не наносится
 
-    base_damage = attacker.strength
+    base_damage = attacker['strength']
     if random.random() < 0.1:  # 10% шанс на спецудар
         base_damage *= 2
         await asyncio.sleep(1)
-        await message.answer(f"{attacker.username} наносит спецудар с уроном {base_damage:.2f}!")
+        # msg_del = await message.answer_animation(
+        #     FSInputFile("../static/popeye-meat-market.gif"),
+        #     caption=f"@{attacker.username} наносит спецудар с уроном {base_damage:.2f}!"
+        # )
+        await message.answer(f"@{attacker['username']} наносит спецудар с уроном {base_damage:.2f}!")
+        # await asyncio.sleep(2.5)
+        # await msg_del.delete()
     return base_damage
 
 

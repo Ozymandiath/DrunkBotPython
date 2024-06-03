@@ -26,7 +26,7 @@ class KeyCheckMiddleware(BaseMiddleware):
             user = result.scalar()
             last_update = user.drunk_date
 
-            if datetime.now().date().day - last_update.day >= 1:
+            if (datetime.now().date() - last_update).days >= 1:
                 user.drunkenness = 0
                 user.drunk_date = datetime.now().date()
                 await session.commit()

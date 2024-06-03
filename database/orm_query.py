@@ -23,7 +23,10 @@ async def orm_add_user(session: AsyncSession, data: dict):
 async def orm_get_user_stat(session: AsyncSession, user_id: int):
     query = select(User).where(User.user_id == user_id)
     result = await session.execute(query)
-    return result.scalar()
+    user = result.scalar_one_or_none()
+    if user:
+        await session.refresh(user)
+    return user
 
 
 async def orm_update_stat(session: AsyncSession, user_id: int, data):
@@ -37,12 +40,12 @@ async def orm_update_stat(session: AsyncSession, user_id: int, data):
     await session.commit()
 
 
-async def orm_get_opponent(session: AsyncSession, user, diff: int):
+async def orm_get_opponent(session: AsyncSession, data, diff: int):
     query = (select(User)
-             .where(User.level >= user.level - diff)
-             .where(User.level <= user.level + diff)
+             .where(User.level >= data["level"] - diff)
+             .where(User.level <= data["level"] + diff)
              # .where(User.is_searching == True)
-             .where(User.user_id != user.user_id))
+             .where(User.user_id != data["user_id"]))
 
     result = await session.execute(query)
     return result.all()
@@ -64,7 +67,10 @@ async def orm_update_level(session: AsyncSession, user_data):
 async def orm_get_user_status(session: AsyncSession, user_id: int):
     query = select(User).where(User.user_id == user_id)
     result = await session.execute(query)
-    return result.scalar()
+    user = result.scalar_one_or_none()
+    if user:
+        await session.refresh(user)
+    return user
 
 
 async def orm_update_user_status(session: AsyncSession, user_id: int, is_searching: bool, is_in_duel: bool):
@@ -133,7 +139,10 @@ async def orm_update_duel_win(session: AsyncSession, user_id: int, opponent_id: 
 async def orm_check_user(session: AsyncSession, username: str):
     query = select(User).where(User.username == username)
     result = await session.execute(query)
-    return result.scalar()
+    user = result.scalar_one_or_none()
+    if user:
+        await session.refresh(user)
+    return user
 
 
 async def orm_add_duel(session: AsyncSession, user_id: int, opponent_id: int, status: str):

@@ -2,7 +2,7 @@ from datetime import datetime
 
 from aiogram import Router, types, F
 from aiogram.filters import CommandStart
-from aiogram.types import Message, InlineKeyboardButton
+from aiogram.types import Message, InlineKeyboardButton, FSInputFile, WebAppInfo
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 from aiogram.utils.markdown import hbold
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -58,9 +58,9 @@ async def start_command(message: types.Message, session: AsyncSession):
         await orm_add_user(session, obj)
         await message.answer("Вы стали новым участником!")
     except Exception as e:
-        await message.answer(f"Ошибка: \n{str(e)}\nОтправь эту ошибку в поддержку, пускай работают")
+        await message.answer(f'Ошибка: \n{str(e)}\nОтправь эту ошибку в поддержку, пускай работают')
 
-    await message.answer(f"Привет, {message.from_user.full_name}!", reply_markup=kb_start())
+    await message.answer(f'Привет, {message.from_user.full_name}!', reply_markup=kb_start())
 
 
 @private_router.message((F.text.lower().contains("статистик")) | (F.text.lower().contains("характеристик")))
@@ -72,12 +72,15 @@ async def static_handler(message: types.Message, session: AsyncSession) -> None:
     )
 
     user_stat = await orm_get_user_stat(session, message.from_user.id)
-    await message.answer(f"{hbold("Уровень:")}\t{user_stat.level}\tlvl\n"
-                         f"{hbold("Опыт:")}\t{user_stat.experience}\txp\n"
-                         f"{hbold("Здоровье:")}\t{user_stat.health}\thp\n"
-                         f"{hbold("Сила:")}\t{user_stat.strength}\n"
-                         f"{hbold("Ловкость:")}\t{user_stat.agility}\n"
-                         f"{hbold("Опьянение:")}\t{user_stat.drunkenness}\t%\n", reply_markup=builder.as_markup())
+
+    # await message.answer(
+    await message.answer_photo(FSInputFile("static/1.png"),
+                               f'{hbold("Уровень:")}\t{user_stat.level}\tlvl\n'
+                               f'{hbold("Опыт:")}\t{user_stat.experience}\txp\n'
+                               f'{hbold("Здоровье:")}\t{user_stat.health}\thp\n'
+                               f'{hbold("Сила:")}\t{user_stat.strength}\n'
+                               f'{hbold("Ловкость:")}\t{user_stat.agility}\n'
+                               f'{hbold("Опьянение:")}\t{user_stat.drunkenness}\t%\n', reply_markup=builder.as_markup())
 
 
 @private_router.callback_query(F.data == "train")
@@ -88,9 +91,10 @@ async def train_action(callback: types.CallbackQuery, session: AsyncSession) -> 
         return
 
     await callback.message.answer_animation(
-        "CgACAgQAAxkBAANsZhQYQ06lFdzzuYgTPEkrKmWTrU4AAuUCAAJCJxVTCtjm5Yaz5A80BA",
+        FSInputFile("static/pushups-intense.gif"),
         reply_markup=kb_train()
     )
+    # await callback.message.answer("qwert", reply_markup=kb_train())
 
     cancel_builder = InlineKeyboardBuilder()
     cancel_builder.row(InlineKeyboardButton(text='Отмена', callback_data='cancel'))
@@ -123,11 +127,11 @@ async def skills_up_handler(message: Message, session: AsyncSession) -> None:
             await orm_update_stat(session, message.from_user.id, user_stat)
             await message.answer("Здоровье прокачено!", reply_markup=kb_start())
         elif message.text == "Сила":
-            user_stat.strength += 1
+            user_stat.strength += 0.5
             await orm_update_stat(session, message.from_user.id, user_stat)
             await message.answer("Сила прокачена!", reply_markup=kb_start())
         elif message.text == "Ловкость":
-            user_stat.agility += 1
+            user_stat.agility += 0.5
             await orm_update_stat(session, message.from_user.id, user_stat)
             await message.answer("Ловкость прокачена!", reply_markup=kb_start())
     else:
@@ -145,12 +149,16 @@ async def duel_handler(message: Message) -> None:
 
 @private_router.message(F.text == "Таверна (Будет позже)")
 async def duel_handler(message: Message) -> None:
-    await message.answer("Написано же будет позже, зачем нажимать!", reply_markup=kb_duel())
+    test_builder = InlineKeyboardBuilder()
+    web_info = WebAppInfo(url='https://ru.stackoverflow.com')  # ссылка для приложения
+    button1 = InlineKeyboardButton(text="Веб", web_app=web_info)
+    test_builder.add(button1)
+    await message.answer("Написано же будет позже, зачем нажимать!", reply_markup=test_builder.as_markup())
 
 
 @private_router.message(F.animation)
 async def echo_gif(message: Message):
-    await message.answer(f"{message.animation.file_id}")
+    await message.answer(f'{message.animation.file_id}')
 
 
 # @private_router.message()
